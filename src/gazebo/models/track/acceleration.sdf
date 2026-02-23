@@ -1,0 +1,415 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sdf version="1.4">
+  <model name="some track">
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>5.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_001</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>10.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_002</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>15.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_003</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>20.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_004</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>25.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_005</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>30.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_006</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>35.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_007</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>40.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_008</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>45.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_009</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>50.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_010</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>55.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_011</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>60.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_012</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>65.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_013</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_blue</uri>
+      <pose>70.0 -1.9 0 0 0 0</pose>
+      <name>cone_blue_014</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>5.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_001</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>10.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_002</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>15.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_003</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>20.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_004</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>25.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_005</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>30.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_006</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>35.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_007</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>40.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_008</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>45.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_009</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>50.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_010</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>55.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_011</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>60.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_012</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>65.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_013</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_yellow</uri>
+      <pose>70.0 1.9 0 0 0 0</pose>
+      <name>cone_yellow_014</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>80.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_001</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>80.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_002</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>85.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_003</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>85.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_004</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>90.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_005</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>90.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_006</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>95.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_007</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>95.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_008</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>100.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_009</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>100.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_010</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>105.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_011</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>105.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_012</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>110.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_013</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>110.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_014</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>115.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_015</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>115.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_016</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>120.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_017</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>120.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_018</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>125.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_019</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>125.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_020</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>130.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_021</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>130.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_022</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>135.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_023</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>135.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_024</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>140.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_025</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>140.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_026</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>145.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_027</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>145.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_028</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>150.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_029</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>150.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_030</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>155.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_031</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>155.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_032</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>160.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_033</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>160.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_034</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>165.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_035</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>165.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_036</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>170.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_037</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>170.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_038</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>175.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_039</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>175.0 -1.9 0 0 0 0</pose>
+      <name>cone_orange_040</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>175.0 0.0 0 0 0 0</pose>
+      <name>cone_orange_041</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange</uri>
+      <pose>175.0 1.9 0 0 0 0</pose>
+      <name>cone_orange_042</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>-0.3 1.9 0 0 0 0</pose>
+      <name>cone_orange_big_001</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>-0.3 -1.9 0 0 0 0</pose>
+      <name>cone_orange_big_002</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>0.3 1.9 0 0 0 0</pose>
+      <name>cone_orange_big_003</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>0.3 -1.9 0 0 0 0</pose>
+      <name>cone_orange_big_004</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>74.7 1.9 0 0 0 0</pose>
+      <name>cone_orange_big_005</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>74.7 -1.9 0 0 0 0</pose>
+      <name>cone_orange_big_006</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>75.3 1.9 0 0 0 0</pose>
+      <name>cone_orange_big_007</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/cone_orange_big</uri>
+      <pose>75.3 -1.9 0 0 0 0</pose>
+      <name>cone_orange_big_008</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/time_keeping</uri>
+      <pose>0.0 2.4 0 0 0 0</pose>
+      <name>time_keeping_001</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/time_keeping</uri>
+      <pose>0.0 -2.4 0 0 0 0</pose>
+      <name>time_keeping_002</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/time_keeping</uri>
+      <pose>75.0 2.4 0 0 0 0</pose>
+      <name>time_keeping_003</name>
+    </include>
+    <include>
+      <uri>model://gazebo/models/time_keeping</uri>
+      <pose>75.0 -2.4 0 0 0 0</pose>
+      <name>time_keeping_004</name>
+    </include>
+  </model>
+</sdf>

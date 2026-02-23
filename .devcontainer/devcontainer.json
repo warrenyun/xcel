@@ -1,0 +1,6 @@
+{
+  "name": "ht dv sim",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace"
+}
