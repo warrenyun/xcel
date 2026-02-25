@@ -22,18 +22,20 @@ RUN apt-get update && apt-get install -y \
   ninja-build \
   git \
   g++ \
-  pkg-config
+  pkg-config \
+  libzip-dev \
+  libpugixml-dev
 
-# fmu forge
+# FMI4cpp
 WORKDIR /tmp
-RUN git clone https://github.com/projectchrono/fmu-forge.git
-WORKDIR /tmp/fmu-forge
-RUN chmod +x fmusim/fmusim.x86_64-linux
-RUN cmake -B build -G Ninja \
-  -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DFMU_TESTING=OFF
-
-RUN cmake --build build || true
+RUN git clone https://github.com/NTNU-IHB/FMI4cpp.git
+WORKDIR /tmp/FMI4cpp
+RUN cmake -S . -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DFMI4CPP_BUILD_TESTS=OFF \
+    -DFMI4CPP_BUILD_EXAMPLES=OFF
+RUN cmake --build build
 RUN cmake --install build
 
 # runtime dev deps
