@@ -1,8 +1,10 @@
 #include "vehicle_fmi.hpp"
 
 #include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/details/world_control.pb.h>
 #include <gz/msgs/pose.pb.h>
 #include <gz/transport/Node.hh>
+#include <gz/msgs/world_control.pb.h>
 
 #include <chrono>
 #include <cmath>
@@ -14,13 +16,13 @@
 namespace {
 
 struct AppConfig {
-  std::string world_name = "track.sdf";
+  std::string world_name = "track";
   std::string model_name = "vehicle";
   std::string fmu_path = "two_track_modelica_model.fmu";
   double step_s = 0.01;
-  double drive_torque_nm = 120.0;
+  double drive_torque_nm = 0.0001;
   double steering_rad = 0.0;
-  double z_world_m = 0.2;
+  double z_world_m = 0.0;
 };
 
 AppConfig parse_args(int argc, char** argv) {
@@ -96,6 +98,15 @@ int main(int argc, char** argv) {
               << " steering_rad=" << config.steering_rad << "\n";
 
     std::size_t step_idx = 0;
+    /* Pause sim before loop for synchronization */
+    gz::msgs::WorldControl pause_msg;
+    pause_msg.set_pause(true);
+    gz::msgs::Boolean pause_response;
+    bool ok = false;
+    node.Request("/world/" + config.world_name + "/control", pause_msg, 1000, pause_response, ok);
+
+
+
     while (true) {
       vehicle.update_state(input, config.step_s);
       const sim::VehicleState state = vehicle.state();
@@ -118,7 +129,10 @@ int main(int argc, char** argv) {
       }
 
       ++step_idx;
-      std::this_thread::sleep_for(std::chrono::duration<double>(config.step_s));
+      gz::msgs::WorldControl step_msg;
+      step_msg.set_multi_step(1);
+      gz::msgs::Boolean step_resp;
+      node.Request("/world/" + config.world_name + "/control", step_msg, 1000, step_resp, ok);
     }
   } catch (const std::exception& ex) {
     std::cerr << "fatal: " << ex.what() << "\n";

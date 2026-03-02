@@ -56,7 +56,7 @@ private:
   ValueRef get_real_value_reference(const std::string& variable_name) const;
   void resolve_variable_references();
   void write_input_to_fmu(const VehicleInput& input);
-  void read_state_from_fmu();
+  void unpack_fmu_state();
 
   fmi4cpp::fmi2::fmu _fmu;
   std::unique_ptr<fmi4cpp::fmi2::cs_fmu> _cs_fmu;

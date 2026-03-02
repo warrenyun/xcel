@@ -47,7 +47,7 @@ Vehicle::Vehicle(
       _instance->exit_initialization_mode(),
       "FMU exit_initialization_mode failed");
 
-  read_state_from_fmu();
+  unpack_fmu_state();
 }
 
 VehicleState Vehicle::state() const { return _current_state; }
@@ -69,7 +69,7 @@ void Vehicle::update_state(const VehicleInput& input, const double step_size_s) 
   require_success(_instance->step(step_size_s), "FMU step failed");
 
   _last_input = input;
-  read_state_from_fmu();
+  unpack_fmu_state();
 }
 
 std::vector<fmi4cpp::fmi4cppByte> Vehicle::serialize_fmu_state() const {
@@ -111,7 +111,7 @@ void Vehicle::deserialize_fmu_state(
     throw std::runtime_error("FMU free_fmu_state failed after restore");
   }
 
-  read_state_from_fmu();
+  unpack_fmu_state();
 }
 
 Vehicle::ValueRef Vehicle::get_real_value_reference(
@@ -165,7 +165,7 @@ void Vehicle::write_input_to_fmu(const VehicleInput& input) {
   require_success(_instance->write_real(refs, values), "FMU write_real inputs failed");
 }
 
-void Vehicle::read_state_from_fmu() {
+void Vehicle::unpack_fmu_state() {
   const std::vector<ValueRef> refs = {
       _state_vr.ax_world,
       _state_vr.ay_world,

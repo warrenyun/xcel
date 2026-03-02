@@ -3,9 +3,9 @@
   Echo lidar messages with:  gz topic -e -t /lidar
 -->
 <sdf version="1.10">
-  <world name="visualize_lidar_world">
+  <world name="track">
     <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
+      <max_step_size>0.01</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
     <plugin
@@ -20,6 +20,10 @@
     <plugin
       filename="gz-sim-scene-broadcaster-system"
       name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
     </plugin>
 
     <gui fullscreen="0">
@@ -190,7 +194,7 @@
         <sensor name='gpu_lidar' type='gpu_lidar'>
           <topic>lidar</topic>
           <always_on>true</always_on>
-          <update_rate>10</update_rate>
+          <update_rate>100</update_rate>
           <lidar>
             <scan>
               <horizontal>
