@@ -161,25 +161,25 @@
       </link>
     </model>
 
-    <model name="lidar">
+    <model name="vehicle">
       <static>true</static>
-      <pose>0 0 0 0 0 0</pose>
-      <link name="link">
-        <inertial>
-          <mass>0.1</mass>
-          <inertia>
-            <ixx>0.000166667</ixx>
-            <iyy>0.000166667</iyy>
-            <izz>0.000166667</izz>
-          </inertia>
-        </inertial>
-        <collision name="collision">
+      <pose>0 0 0.2 0 0 0</pose>
+      <link name="base_link">
+        <visual name="visual">
           <geometry>
             <box>
-              <size>0.1 0.1 0.1</size>
+              <size>1.6 0.8 0.35</size>
             </box>
           </geometry>
-        </collision>
+          <material>
+            <ambient>0.9 0.1 0.1 1</ambient>
+            <diffuse>0.9 0.1 0.1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+      <link name="lidar_link">
+        <pose>0.75 0.0 0.15 0 0 0</pose>
         <visual name="visual">
           <geometry>
             <box>
@@ -216,6 +216,10 @@
           <visualize>true</visualize>
         </sensor>
       </link>
+      <joint name="lidar_mount" type="fixed">
+        <parent>base_link</parent>
+        <child>lidar_link</child>
+      </joint>
     </model>
 
     <include>

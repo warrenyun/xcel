@@ -1,27 +1,23 @@
 cmake_minimum_required(VERSION 3.20)
-project(ht_dv_sim LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_subdirectory(gazebo)
-
-include(GNUInstallDirs)
 find_package(gz-sim8 REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 find_package(fmi4cpp REQUIRED)
 
-add_executable(dv_sim
-    main.cpp
+add_library(gazebo
+  src/vehicle_fmi.cpp
 )
 
-target_link_libraries(dv_sim PRIVATE
-    gazebo
-)
+target_include_directories(gazebo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-# Install runtime executable
-install(TARGETS dv_sim
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+target_link_libraries(gazebo PUBLIC
+    gz-sim8::gz-sim8
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
+    fmi4cpp::fmi4cpp
 )

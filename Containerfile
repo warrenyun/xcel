@@ -1,7 +1,7 @@
 # gz sim layer
 FROM ubuntu:24.04 as gz-base
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GZ_SIM_RESOURCE_PATH=/workspace/src
+ENV GZ_SIM_RESOURCE_PATH=/workspace
 
 RUN apt-get update && apt-get install -y \
   wget \
