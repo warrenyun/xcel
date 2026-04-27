@@ -1,143 +1,128 @@
 #include "vehicle_fmi.hpp"
 
 #include <gz/msgs/boolean.pb.h>
-#include <gz/msgs/details/world_control.pb.h>
+#include <gz/msgs/float_v.pb.h>
 #include <gz/msgs/pose.pb.h>
-#include <gz/transport/Node.hh>
 #include <gz/msgs/world_control.pb.h>
+#include <gz/transport/Node.hh>
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
-#include <exception>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
 
-namespace {
+static constexpr char WORLD_NAME[] = "track";
+static constexpr char MODEL_NAME[] = "vehicle";
+static constexpr char FMU_PATH[] = "two_track_modelica_model.fmu";
+static constexpr double STEP_S = 0.01;
+static constexpr double Z_WORLD_M = 0.0;
+static constexpr auto INPUT_TIMEOUT = std::chrono::milliseconds(100);
 
-struct AppConfig {
-  std::string world_name = "track";
-  std::string model_name = "vehicle";
-  std::string fmu_path = "two_track_modelica_model.fmu";
-  double step_s = 0.01;
-  double drive_torque_nm = 0.0001;
-  double steering_rad = 0.0;
-  double z_world_m = 0.0;
-};
-
-AppConfig parse_args(int argc, char** argv) {
-  AppConfig config;
-  if (argc > 1) {
-    config.fmu_path = argv[1];
-  }
-  if (argc > 2) {
-    config.world_name = argv[2];
-  }
-  if (argc > 3) {
-    config.model_name = argv[3];
-  }
-  if (argc > 4) {
-    config.step_s = std::stod(argv[4]);
-  }
-  if (argc > 5) {
-    config.drive_torque_nm = std::stod(argv[5]);
-  }
-  if (argc > 6) {
-    config.steering_rad = std::stod(argv[6]);
-  }
-  return config;
-}
-
-void fill_pose_request(
-    const std::string& model_name,
-    const sim::VehicleState& state,
-    const double z_world_m,
-    gz::msgs::Pose& request) {
-  request.Clear();
-  request.set_name(model_name);
-
-  auto* position = request.mutable_position();
-  position->set_x(state.x_world);
-  position->set_y(state.y_world);
-  position->set_z(z_world_m);
-
+static void fill_pose(const sim::VehicleState& state, gz::msgs::Pose& msg) {
+  msg.Clear();
+  msg.set_name(MODEL_NAME);
+  auto* p = msg.mutable_position();
+  p->set_x(state.x_world);
+  p->set_y(state.y_world);
+  p->set_z(Z_WORLD_M);
   const double half_yaw = state.psi_world * 0.5;
-  auto* orientation = request.mutable_orientation();
-  orientation->set_w(std::cos(half_yaw));
-  orientation->set_x(0.0);
-  orientation->set_y(0.0);
-  orientation->set_z(std::sin(half_yaw));
+  auto* q = msg.mutable_orientation();
+  q->set_w(std::cos(half_yaw));
+  q->set_x(0.0);
+  q->set_y(0.0);
+  q->set_z(std::sin(half_yaw));
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+int main() {
   try {
-    const AppConfig config = parse_args(argc, argv);
-    if (config.step_s <= 0.0) {
-      std::cerr << "step_s must be > 0\n";
-      return 1;
-    }
+    sim::Vehicle vehicle(FMU_PATH, STEP_S);
 
-    sim::Vehicle vehicle(config.fmu_path, config.step_s, 0.0);
-    sim::VehicleInput input;
-    input.torque_fl = config.drive_torque_nm;
-    input.torque_fr = config.drive_torque_nm;
-    input.torque_rl = config.drive_torque_nm;
-    input.torque_rr = config.drive_torque_nm;
-    input.wheel_steer_rad = config.steering_rad;
+    std::mutex input_mu;
+    sim::VehicleInput shared_input{};
+    auto last_input_time = std::chrono::steady_clock::now();
 
-    gz::transport::Node node;
-    const std::string service_name = "/world/" + config.world_name + "/set_pose";
+    std::atomic<bool> running{true};
 
-    std::cout << "FMU path: " << config.fmu_path << "\n";
-    std::cout << "Driving model '" << config.model_name << "' in world '"
-              << config.world_name << "' via " << service_name << "\n";
-    std::cout << "step_s=" << config.step_s
-              << " torque=" << config.drive_torque_nm
-              << " steering_rad=" << config.steering_rad << "\n";
+    std::thread sim_thread([&] {
+      gz::transport::Node node;
+      const std::string pose_srv =
+          std::string("/world/") + WORLD_NAME + "/set_pose";
+      const std::string ctrl_srv =
+          std::string("/world/") + WORLD_NAME + "/control";
 
-    std::size_t step_idx = 0;
-    /* Pause sim before loop for synchronization */
-    gz::msgs::WorldControl pause_msg;
-    pause_msg.set_pause(true);
-    gz::msgs::Boolean pause_response;
-    bool ok = false;
-    node.Request("/world/" + config.world_name + "/control", pause_msg, 1000, pause_response, ok);
+      gz::msgs::WorldControl pause_msg;
+      pause_msg.set_pause(true);
+      gz::msgs::Boolean resp;
+      bool ok = false;
+      node.Request(ctrl_srv, pause_msg, 1000, resp, ok);
 
+      std::size_t step_idx = 0;
 
+      while (running.load(std::memory_order_relaxed)) {
+        sim::VehicleInput input;
+        {
+          std::lock_guard lock(input_mu);
+          input = shared_input;
+          auto age = std::chrono::steady_clock::now() - last_input_time;
+          if (age > INPUT_TIMEOUT) {
+            input.torque_fl = 0.0;
+            input.torque_fr = 0.0;
+            input.torque_rl = 0.0;
+            input.torque_rr = 0.0;
+          }
+        }
 
-    while (true) {
-      vehicle.update_state(input, config.step_s);
-      const sim::VehicleState state = vehicle.state();
+        vehicle.update_state(input);
+        const auto state = vehicle.state();
 
-      gz::msgs::Pose request;
-      fill_pose_request(config.model_name, state, config.z_world_m, request);
+        gz::msgs::Pose pose_req;
+        fill_pose(state, pose_req);
+        bool req_ok = false;
+        node.Request(pose_srv, pose_req, 1000, resp, req_ok);
 
-      gz::msgs::Boolean response;
-      bool request_succeeded = false;
-      const bool service_called = node.Request(
-          service_name, request, 1000, response, request_succeeded);
+        if (!req_ok || !resp.data()) {
+          std::cerr << "set_pose failed\n";
+        } else if (step_idx % 100 == 0) {
+          std::cout << "t=" << vehicle.simulation_time_s()
+                    << " x=" << state.x_world
+                    << " y=" << state.y_world
+                    << " yaw=" << state.psi_world << "\n";
+        }
 
-      if (!service_called || !request_succeeded || !response.data()) {
-        std::cerr << "Failed set_pose request on " << service_name << "\n";
-      } else if (step_idx % 100 == 0) {
-        std::cout << "t=" << vehicle.simulation_time_s()
-                  << " x=" << state.x_world
-                  << " y=" << state.y_world
-                  << " yaw=" << state.psi_world << "\n";
+        gz::msgs::WorldControl step_msg;
+        step_msg.set_multi_step(1);
+        node.Request(ctrl_srv, step_msg, 1000, resp, ok);
+
+        ++step_idx;
+        std::this_thread::sleep_for(std::chrono::duration<double>(STEP_S));
       }
+    });
 
-      ++step_idx;
-      gz::msgs::WorldControl step_msg;
-      step_msg.set_multi_step(1);
-      gz::msgs::Boolean step_resp;
-      node.Request("/world/" + config.world_name + "/control", step_msg, 1000, step_resp, ok);
-    }
+    gz::transport::Node input_node;
+    input_node.Subscribe<gz::msgs::Float_V>(
+        "/vehicle/cmd",
+        [&](const gz::msgs::Float_V& msg) {
+          if (msg.data_size() < 5) return;
+          std::lock_guard lock(input_mu);
+          shared_input.torque_fl = msg.data(0);
+          shared_input.torque_fr = msg.data(1);
+          shared_input.torque_rl = msg.data(2);
+          shared_input.torque_rr = msg.data(3);
+          shared_input.wheel_steer_rad= msg.data(4);
+          last_input_time = std::chrono::steady_clock::now();
+        });
+
+    std::cout << "listening on /vehicle/cmd (Float_V: fl fr rl rr steer)\n";
+    gz::transport::waitForShutdown();
+
+    running.store(false, std::memory_order_relaxed);
+    sim_thread.join();
+
   } catch (const std::exception& ex) {
     std::cerr << "fatal: " << ex.what() << "\n";
-    std::cerr << "usage: dv_sim [fmu_path] [world_name] [model_name] [step_s] "
-                 "[drive_torque_nm] [steering_rad]\n";
     return 1;
   }
 }

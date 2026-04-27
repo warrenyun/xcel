@@ -1,4 +1,4 @@
-.PHONY: dev build clean
+.PHONY: dev build clean local-build local-clean
 
 CONTAINER_ENGINE ?= docker
 REPO_NAME ?= ht-dv-sim
@@ -34,3 +34,13 @@ dev: build
 
 clean:
 	@$(CONTAINER_ENGINE) rm -f $(REPO_NAME)-dev 2>/dev/null || true
+
+local-build:
+	@echo "==> Building locally..."
+	@rm -rf build
+	@cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+	@ln -sf $(PWD)/build/compile_commands.json compile_commands.json
+	@cmake --build build
+
+local-clean:
+	@rm -rf build compile_commands.json

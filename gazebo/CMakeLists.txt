@@ -9,9 +9,6 @@ find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 find_package(fmi4cpp REQUIRED)
 
-add_library(gazebo
-  src/vehicle_fmi.cpp
-)
 
 target_include_directories(gazebo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
