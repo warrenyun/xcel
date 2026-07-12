@@ -15,10 +15,11 @@ from sim.vehicle.dynamics import (
     VehicleParams, step_rk4,
     X, Y, PSI, VX, VY, OMEGA, slip_angle,
 )
-from sim.vehicle.state import jax_to_vehicle_state
+from sim.vehicle.state import derive_vehicle_state
 from sim.comms import SimComms
 from sim.world import World
 from sim.lidar import LidarSensor
+from sim.proto import load_proto
 
 VIEWER_HZ: float = 60.0
 LIDAR_HZ: float = 20.0
@@ -46,6 +47,7 @@ def main():
 
     world: World = World(args.track)
     lidar: LidarSensor = LidarSensor(world)
+    proto = load_proto()
 
     x0: float
     y0: float
@@ -59,12 +61,12 @@ def main():
         visualize.setup_static(world)
         rr.send_blueprint(visualize.blueprint())
 
-    viewer = None
-    if not args.headless:
-        viewer = mujoco.viewer.launch_passive(world.model, world.data)
-        viewer.cam.lookat[:] = [x0, y0, 0.5]
-        viewer.cam.distance = 20.0
-        viewer.cam.elevation = -25.0
+    # viewer = None
+    # if not args.headless:
+    #     viewer = mujoco.viewer.launch_passive(world.model, world.data)
+    #     viewer.cam.lookat[:] = [x0, y0, 0.5]
+    #     viewer.cam.distance = 20.0
+    #     viewer.cam.elevation = -25.0
 
     comms: SimComms = SimComms()
     running: bool = True
@@ -81,7 +83,8 @@ def main():
     wall_start: float = time.perf_counter()
     last_pts: np.ndarray = np.empty((0, 3), dtype=np.float32)
 
-    while running and (viewer is None or viewer.is_running()):
+    while False:
+    # while running and (viewer is None or viewer.is_running()):
         comms.drain_commands()
         cmd = comms.current_input()
 
@@ -100,7 +103,7 @@ def main():
         psi_i: float = float(state[PSI])
 
         world.set_car_pose(x_i, y_i, psi_i)
-        comms.send_state(jax_to_vehicle_state(state, u, params))
+        comms.send_state(derive_vehicle_state(state, u, params))
 
         if step_i % lidar_rate == 0:
             last_pts = lidar.scan()

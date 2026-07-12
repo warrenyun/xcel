@@ -54,17 +54,17 @@ class VehicleState:
     def unpack(cls, data: bytes) -> "VehicleState":
         return cls(*struct.unpack(_STATE_FMT, data))
 
-def jax_to_vehicle_state(jax_state: jax.Array, jax_input: jax.Array, params: VehicleParams) -> VehicleState:
-    """Derive VehicleState from the JAX state vector."""
-    deriv: jax.Array = xdot(jax_state, jax_input, params)
+def derive_vehicle_state(state: jax.Array, input: jax.Array, params: VehicleParams) -> VehicleState:
+    """Derives VehicleState from the JAX state and input"""
+    deriv: jax.Array = xdot(state, input, params)
     return VehicleState(
         ax_world=float(deriv[3]),
         ay_world=float(deriv[4]),
         psi_ddot_world=float(deriv[5]),
-        vx_world=float(jax_state[VX]),
-        vy_world=float(jax_state[VY]),
-        psi_dot_world=float(jax_state[OMEGA]),
-        x_world=float(jax_state[X]),
-        y_world=float(jax_state[Y]),
-        psi_world=float(jax_state[PSI]),
+        vx_world=float(state[VX]),
+        vy_world=float(state[VY]),
+        psi_dot_world=float(state[OMEGA]),
+        x_world=float(state[X]),
+        y_world=float(state[Y]),
+        psi_world=float(state[PSI]),
     )

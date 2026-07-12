@@ -9,8 +9,8 @@ from .world import World
 
 N_AZIM: int = 1024
 N_ELEV: int = 128
-ELEV_MIN: float = np.deg2rad(-22.5)
-ELEV_MAX: float = np.deg2rad(22.5)
+ELEV_MIN: float = np.deg2rad(-22.0)
+ELEV_MAX: float = np.deg2rad(22.0)
 MAX_RANGE: float = 250.0
 
 class LidarSensor:
@@ -77,6 +77,11 @@ class LidarSensor:
             return np.empty((0, 3), dtype=np.float32)
 
         self._apply_noise(self._dist, hit)
+
+        colors: np.ndarray = self._model.geom_rgba[self._geomid[hit]]
+
+        non_ground = ~np.all(np.isclose(colors[:, :3], 0.22), axis=1)
+        # print(colors[non_ground])
 
         pts_world: np.ndarray = pnt + self._vecs_buf[hit] * self._dist[hit, None]
         pts_local: np.ndarray = ((pts_world - pnt) @ R).astype(np.float32)

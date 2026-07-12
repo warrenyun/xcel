@@ -39,6 +39,7 @@ dependencies = [
     "opt-einsum==3.4.0",
     "packaging==26.2",
     "pillow==12.2.0",
+    "protobuf>=7.35.1",
     "psutil==7.2.2",
     "pyarrow==24.0.0",
     "pynput==1.8.2",
