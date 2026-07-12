@@ -1,66 +1,65 @@
-
-import struct
-import time
-
+"""
+Simulated Ouster OS1 128 Rev8 RGB LiDAR.
+Datasheet: https://data.ouster.io/downloads/datasheets/datasheet-rev8-v4p0-os1.pdf
+"""
 import numpy as np
 import mujoco
-import zmq
 
-LIDAR_ADDR  = "ipc:///tmp/hytech_sim_lidar"
-_HEADER_FMT = "qI4x"  # int64 + uint32 + 4-byte trailing pad
+from .world import World
 
-N_AZIM = 512
-N_ELEV = 32
-ELEV_MIN = -0.261799 # -15 deg
-ELEV_MAX =  0.261799 # +15 deg
-MAX_RANGE = 30.0
-
+N_AZIM: int = 1024
+N_ELEV: int = 128
+ELEV_MIN: float = np.deg2rad(-22.5)
+ELEV_MAX: float = np.deg2rad(22.5)
+MAX_RANGE: float = 250.0
 
 class LidarSensor:
-    def __init__(self, world_model, site_name: str = "lidar_site"):
-        self._model = world_model.model
-        self._data  = world_model.data   # shared reference; updated by WorldModel.set_car_pose
+    def __init__(self, world: World, site_name: str = "lidar_site") -> None:
+        self._model: mujoco.MjModel = world.model
+        self._data: mujoco.MjData = world.data
 
-        self._site_id = mujoco.mj_name2id(
+        self._site_id: int = mujoco.mj_name2id(
             self._model, mujoco.mjtObj.mjOBJ_SITE, site_name
         )
         if self._site_id < 0:
             raise ValueError(f"site '{site_name}' not found in MuJoCo model")
 
-        self._body_exclude = mujoco.mj_name2id(
+        self._body_exclude: int = mujoco.mj_name2id(
             self._model, mujoco.mjtObj.mjOBJ_BODY, "car"
         )
 
-        # Pre-compute ray directions in sensor LOCAL frame (constant across steps).
-        # Convention: x=forward, y=left, z=up (standard sensor frame).
-        azim = np.linspace(-np.pi, np.pi, N_AZIM, endpoint=False)
-        elev = np.linspace(ELEV_MIN, ELEV_MAX, N_ELEV)
-        e_grid, a_grid = np.meshgrid(elev, azim, indexing="ij")  # (32, 512)
-        vx = np.cos(e_grid) * np.cos(a_grid)
-        vy = np.cos(e_grid) * np.sin(a_grid)
-        vz = np.sin(e_grid)
-        self._rays_local = np.stack([vx.ravel(), vy.ravel(), vz.ravel()], axis=1)  # (N,3)
-        self._n_rays = N_AZIM * N_ELEV
+        azim: np.ndarray = np.linspace(-np.pi, np.pi, N_AZIM, endpoint=False)
+        elev: np.ndarray = np.linspace(ELEV_MIN, ELEV_MAX, N_ELEV)
+        e_grid, a_grid = np.meshgrid(elev, azim, indexing="ij")
 
-        self._geomid = np.full(self._n_rays, -1,  dtype=np.int32)
-        self._dist = np.full(self._n_rays, -1.0, dtype=np.float64)
-        self._vecs_buf = np.empty((self._n_rays, 3), dtype=np.float64)
+        vx: np.ndarray = np.cos(e_grid) * np.cos(a_grid)
+        vy: np.ndarray = np.cos(e_grid) * np.sin(a_grid)
+        vz: np.ndarray = np.sin(e_grid)
 
-        ctx = zmq.Context.instance()
-        self._sock = ctx.socket(zmq.PUSH)
-        self._sock.bind(LIDAR_ADDR)
-        self._sock.setsockopt(zmq.SNDHWM, 1)
+        self._rays_local: np.ndarray = np.stack([vx.ravel(), vy.ravel(), vz.ravel()], axis=1)
+        self._n_rays: int = N_AZIM * N_ELEV
+
+        self._geomid: np.ndarray = np.full(self._n_rays, -1, dtype=np.int32)
+        self._dist: np.ndarray = np.full(self._n_rays, -1.0, dtype=np.float64)
+        self._vecs_buf: np.ndarray = np.empty((self._n_rays, 3), dtype=np.float64)
+
+    def _apply_noise(self, distances: np.ndarray, hit: np.ndarray) -> None:
+        """Apply range-dependent Gaussian noise to point cloud"""
+        # Range percision graph from OS1 datasheet
+        RANGE_POINTS = [0,     5,   10,  20,  30,   40,   50,   60,  70,  80,   90] # m
+        SIGMA_POINTS = [0.25, 0.25, 0.3, 0.4, 0.49, 0.55, 0.65, 0.7, 1.0, 1.25, 1.5]  # cm
+
+        r = distances[hit]
+        sigma = np.interp(r, RANGE_POINTS, SIGMA_POINTS)
+        distances[hit] = r + np.random.normal(0.0, sigma)
 
     def scan(self) -> np.ndarray:
-        """
-        Trace all rays. Returns hit points in sensor frame, shape (N, 3).
-        Only rays that actually hit something are included.
-        """
-        pnt = self._data.site_xpos[self._site_id].copy()
-        R = self._data.site_xmat[self._site_id].reshape(3, 3)
+        """Trace all rays. Returns hit points in sensor frame, shape (N, 3)."""
+        pnt: np.ndarray = self._data.site_xpos[self._site_id].copy()
+        R: np.ndarray = self._data.site_xmat[self._site_id].reshape(3, 3)
 
         np.dot(self._rays_local, R.T, out=self._vecs_buf)
-        vecs_flat = self._vecs_buf.ravel()
+        vecs_flat: np.ndarray = self._vecs_buf.ravel()
 
         self._geomid[:] = -1
         self._dist[:] = -1.0
@@ -70,23 +69,16 @@ class LidarSensor:
             pnt, vecs_flat,
             None, True, self._body_exclude,
             self._geomid, self._dist, None,
-            self._n_rays, MAX_RANGE,
+            self._n_rays, MAX_RANGE
         )
 
-        hit = self._dist > 0
+        hit: np.ndarray = self._dist > 0
         if not np.any(hit):
             return np.empty((0, 3), dtype=np.float32)
 
-        # World-frame hit points → back to sensor local frame
-        pts_world = pnt + self._vecs_buf[hit] * self._dist[hit, None]
-        pts_local = ((pts_world - pnt) @ R).astype(np.float32)
+        self._apply_noise(self._dist, hit)
+
+        pts_world: np.ndarray = pnt + self._vecs_buf[hit] * self._dist[hit, None]
+        pts_local: np.ndarray = ((pts_world - pnt) @ R).astype(np.float32)
         return pts_local
 
-    def scan_and_publish(self) -> np.ndarray:
-        pts = self.scan()
-        header = struct.pack(_HEADER_FMT, time.time_ns(), len(pts))
-        try:
-            self._sock.send(header + pts.tobytes(), zmq.NOBLOCK)
-        except zmq.Again:
-            pass
-        return pts
