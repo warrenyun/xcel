@@ -1,328 +1,170 @@
 """
 JAX Two-Track Vehicle Dynamics Model
-=====================================
 
 Reimplementation of the OpenModelica PlanarMechanics two-track model
-with SlipBasedWheelJoint tire model. Pure JAX — JIT-compilable,
-vmappable, and differentiable.
+with SlipBasedWheelJoint tire model.
 
-State vector (10,):
-    [x, y, ψ, vx, vy, ω, ω_fl, ω_fr, ω_rl, ω_rr]
+State vector (10 x 1):
+[x, y, psi, vx, vy, omega, omega_fl, omega_fr, omega_rl, omega_rr]
 
-    x, y       : CG position in world frame [m]
-    ψ (psi)    : Heading angle [rad]
-    vx, vy     : CG velocity in world frame [m/s]
-    ω (omega)  : Yaw rate [rad/s]
-    ω_fl..rr   : Wheel angular velocities [rad/s]
+x, y: CG position in world frame (m)
+psi: Heading angle (rad)
+vx, vy: CG velocity in world frame (m/s)
+omega: Yaw rate (rad/s)
+omega_fl..rr: Wheel angular velocities (rad/s)
 
-Input vector (5,):
-    [τ_fl, τ_fr, τ_rl, τ_rr, δ]
+Input vector (5 x 1):
+[tau_fl, tau_fr, tau_rl, tau_rr, delta]
 
-    τ_fl..rr   : Motor torques [N·m] (pre-gear-ratio)
-    δ (delta)  : Front wheel steering angle [rad]
+tau_fl..rr: Motor torques (Nm)
+delta: Front wheel steering angle (rad)
 """
 
 import jax
 import jax.numpy as jnp
 from typing import NamedTuple
-from functools import partial
-
-
-# ── Parameters ─────────────────────────────────────────────────────
 
 class VehicleParams(NamedTuple):
-    """Vehicle parameters (defaults match OpenModelica FMU)."""
-    # Body
-    m: float = 250.0            # Vehicle mass [kg]
-    I_zz: float = 120.0         # Yaw moment of inertia [kg·m²]
-    # Geometry
-    l_f: float = 0.765          # CG to front axle [m]
-    l_r: float = 0.765          # CG to rear axle [m]
-    w_f: float = 0.6            # Front half-track width [m]
-    w_r: float = 0.6            # Rear half-track width [m]
-    # Wheels
-    r_w: float = 0.2            # Wheel radius [m]
-    I_w: float = 0.094          # Wheel rotational inertia [kg·m²]
-    gear_ratio: float = 11.83   # Motor-to-wheel gear ratio
-    # Tires (Modelica SlipBasedWheelJoint)
-    f_n: float = 600.0          # Normal load per wheel [N] (static, no transfer)
-    mu_a: float = 1.8           # Peak friction coefficient (adhesion)
-    mu_s: float = 1.5           # Sliding friction coefficient
-    s_adh: float = 0.117        # Adhesion slip ratio threshold
-    s_sld: float = 0.35         # Sliding slip ratio threshold
-    v_adh_min: float = 0.005    # Minimum adhesion velocity [m/s]
-    v_sld_min: float = 0.02     # Minimum sliding velocity [m/s]
-
-
-# ── State / input indices ──────────────────────────────────────────
+    m: float = 250.0
+    I_zz: float = 120.0
+    l_f: float = 0.765
+    l_r: float = 0.765
+    w_f: float = 0.6
+    w_r: float = 0.6
+    r_w: float = 0.2
+    I_w: float = 0.094
+    gear_ratio: float = 11.83
+    f_n: float = 600.0
+    mu_a: float = 1.8
+    mu_s: float = 1.5
+    s_adh: float = 0.117
+    s_sld: float = 0.35
+    v_adh_min: float = 0.005
+    v_sld_min: float = 0.02
 
 X, Y, PSI, VX, VY, OMEGA, W_FL, W_FR, W_RL, W_RR = range(10)
+"""Numerical indicies for the vehicle state JAX array"""
+
 TAU_FL, TAU_FR, TAU_RL, TAU_RR, DELTA = range(5)
+"""Numerical indicies for the vehicle input JAX array"""
 
-
-# ── Tire friction model ────────────────────────────────────────────
-
-def _tire_friction(v_slip, v_adh, v_sld, mu_a, mu_s, f_n):
-    """
-    Friction force magnitude from slip velocity magnitude.
-
-    Matches the Modelica SlipBasedWheelJoint friction curve:
-      [0, v_adh)     : Linear adhesion, peaks at μ_a · F_N
-      [v_adh, v_sld) : Cosine interpolation from μ_a → μ_s
-      [v_sld, ∞)     : Constant sliding at μ_s · F_N
-    """
-    eps = 1e-8
-
-    # Adhesion: force rises linearly with slip
+def _tire_friction(
+    v_slip: jax.Array,
+    v_adh: jax.Array,
+    v_sld: jax.Array,
+    mu_a: float,
+    mu_s: float,
+    f_n: float,
+) -> jax.Array:
+    """Friction force magnitude from slip velocity magnitude"""
+    eps: float = 1e-8
     f_adhesion = mu_a * f_n * v_slip / jnp.maximum(v_adh, eps)
-
-    # Transition: smooth cosine blend
     t = jnp.clip((v_slip - v_adh) / jnp.maximum(v_sld - v_adh, eps), 0.0, 1.0)
     mu_t = mu_a - (mu_a - mu_s) * 0.5 * (1.0 - jnp.cos(jnp.pi * t))
     f_transition = mu_t * f_n
-
-    # Sliding: constant force
     f_sliding = mu_s * f_n
-
     return jnp.where(v_slip < v_adh, f_adhesion,
                      jnp.where(v_slip < v_sld, f_transition, f_sliding))
 
+def state(
+    x: float = 0., y: float = 0., psi: float = 0.,
+    vx: float = 0., vy: float = 0., omega: float = 0.,
+    w_fl: float = 0., w_fr: float = 0.,
+    w_rl: float = 0., w_rr: float = 0.,
+) -> jax.Array:
+    """Returns a JAX array of a vehicle state"""
+    return jnp.array([x, y, psi, vx, vy, omega, w_fl, w_fr, w_rl, w_rr])
 
-# ── Continuous dynamics ────────────────────────────────────────────
+def input(
+    tau_fl: float = 0., tau_fr: float = 0.,
+    tau_rl: float = 0., tau_rr: float = 0.,
+    steer: float = 0.,
+) -> jax.Array:
+    """Returns a JAX array of a vehicle input"""
+    return jnp.array([tau_fl, tau_fr, tau_rl, tau_rr, steer])
 
 @jax.jit
-def dynamics(state, u, params):
-    """
-    State derivative ẋ = f(x, u, p).
+def xdot(state: jax.Array, u: jax.Array, params: VehicleParams) -> jax.Array:
+    """State derivative x_dot = f(x, u)."""
+    p: VehicleParams = params
+    eps: float = 1e-10
 
-    Args:
-        state:  (10,) state vector
-        u:      (5,)  input vector [τ_fl, τ_fr, τ_rl, τ_rr, δ]
-        params: VehicleParams
+    psi: jax.Array = state[PSI]
+    vx: jax.Array = state[VX]
+    vy: jax.Array = state[VY]
+    omega: jax.Array = state[OMEGA]
+    w: jax.Array = state[6:10]
 
-    Returns:
-        (10,) state derivative
-    """
-    p = params
-    eps = 1e-10
+    tau_drive: jax.Array = u[:4] * p.gear_ratio
+    delta: jax.Array = u[DELTA]
 
-    psi   = state[PSI]
-    vx    = state[VX]
-    vy    = state[VY]
-    omega = state[OMEGA]
-    w     = state[6:10]                    # wheel speeds (4,)
+    c_psi: jax.Array = jnp.cos(psi)
+    s_psi: jax.Array = jnp.sin(psi)
 
-    tau_drive = u[:4] * p.gear_ratio       # post-gearbox torques (4,)
-    delta     = u[DELTA]
-
-    c_psi, s_psi = jnp.cos(psi), jnp.sin(psi)
-
-    # ── Wheel positions in body frame (4×2) ────────────────────────
-    r_body = jnp.array([
-        [ p.l_f,  p.w_f],    # FL
-        [ p.l_f, -p.w_f],    # FR
-        [-p.l_r,  p.w_r],    # RL
-        [-p.l_r, -p.w_r],    # RR
+    r_body: jax.Array = jnp.array([
+        [ p.l_f,  p.w_f],
+        [ p.l_f, -p.w_f],
+        [-p.l_r,  p.w_r],
+        [-p.l_r, -p.w_r],
     ])
 
-    # Rotate to world frame
-    r_wx = c_psi * r_body[:, 0] - s_psi * r_body[:, 1]
-    r_wy = s_psi * r_body[:, 0] + c_psi * r_body[:, 1]
+    r_wx: jax.Array = c_psi * r_body[:, 0] - s_psi * r_body[:, 1]
+    r_wy: jax.Array = s_psi * r_body[:, 0] + c_psi * r_body[:, 1]
 
-    # ── Contact-point velocities ───────────────────────────────────
-    # v_contact = v_cg + ω × r   (2D cross: ω×[rx,ry] = [-ω·ry, ω·rx])
-    v_cx = vx - omega * r_wy
-    v_cy = vy + omega * r_wx
+    v_cx: jax.Array = vx - omega * r_wy
+    v_cy: jax.Array = vy + omega * r_wx
 
-    # ── Wheel headings ─────────────────────────────────────────────
-    steer = jnp.array([delta, delta, 0.0, 0.0])
-    heading = psi + steer
-    c_h, s_h = jnp.cos(heading), jnp.sin(heading)
+    steer: jax.Array = jnp.array([delta, delta, 0.0, 0.0])
+    heading: jax.Array = psi + steer
+    c_h: jax.Array = jnp.cos(heading)
+    s_h: jax.Array = jnp.sin(heading)
 
-    # ── Velocity in each wheel's frame ─────────────────────────────
-    v_long = v_cx * c_h + v_cy * s_h       # longitudinal (4,)
-    v_lat  = -v_cx * s_h + v_cy * c_h      # lateral (4,)
+    v_long: jax.Array = v_cx * c_h + v_cy * s_h
+    v_lat: jax.Array = -v_cx * s_h + v_cy * c_h
 
-    # ── Slip velocities ────────────────────────────────────────────
-    v_slip_long = v_long - w * p.r_w
-    v_slip_lat  = v_lat
-    v_slip_mag  = jnp.sqrt(v_slip_long**2 + v_slip_lat**2 + eps)
+    v_slip_long: jax.Array = v_long - w * p.r_w
+    v_slip_lat: jax.Array = v_lat
+    v_slip_mag: jax.Array = jnp.sqrt(v_slip_long**2 + v_slip_lat**2 + eps)
 
-    # Speed-dependent friction thresholds
-    v_adh = jnp.maximum(p.s_adh * jnp.abs(v_long), p.v_adh_min)
-    v_sld = jnp.maximum(p.s_sld * jnp.abs(v_long), p.v_sld_min)
+    v_adh: jax.Array = jnp.maximum(p.s_adh * jnp.abs(v_long), p.v_adh_min)
+    v_sld: jax.Array = jnp.maximum(p.s_sld * jnp.abs(v_long), p.v_sld_min)
 
-    # ── Tire forces ────────────────────────────────────────────────
-    f_mag  = _tire_friction(v_slip_mag, v_adh, v_sld, p.mu_a, p.mu_s, p.f_n)
-    f_long = -f_mag * v_slip_long / v_slip_mag    # opposes slip (4,)
-    f_lat  = -f_mag * v_slip_lat  / v_slip_mag    # opposes slip (4,)
+    f_mag: jax.Array = _tire_friction(v_slip_mag, v_adh, v_sld, p.mu_a, p.mu_s, p.f_n)
+    f_long: jax.Array = -f_mag * v_slip_long / v_slip_mag
+    f_lat: jax.Array = -f_mag * v_slip_lat / v_slip_mag
 
-    # ── World-frame forces ─────────────────────────────────────────
-    Fx = f_long * c_h - f_lat * s_h
-    Fy = f_long * s_h + f_lat * c_h
+    Fx: jax.Array = f_long * c_h - f_lat * s_h
+    Fy: jax.Array = f_long * s_h + f_lat * c_h
 
-    # ── Body accelerations ─────────────────────────────────────────
-    ax    = jnp.sum(Fx) / p.m
-    ay    = jnp.sum(Fy) / p.m
-    alpha = jnp.sum(r_wx * Fy - r_wy * Fx) / p.I_zz
+    ax: jax.Array = jnp.sum(Fx) / p.m
+    ay: jax.Array = jnp.sum(Fy) / p.m
+    alpha: jax.Array = jnp.sum(r_wx * Fy - r_wy * Fx) / p.I_zz
 
-    # ── Wheel spin dynamics ────────────────────────────────────────
-    # I_w · ẇ = τ_drive − F_long · r_w
-    w_dot = (tau_drive - f_long * p.r_w) / p.I_w
+    # I_w * w_dot = tau_drive - f_long * r_w
+    w_dot: jax.Array = (tau_drive - f_long * p.r_w) / p.I_w
 
     return jnp.array([
-        vx, vy, omega,            # dx, dy, dpsi
-        ax, ay, alpha,            # dvx, dvy, domega
-        w_dot[0], w_dot[1],       # dw_fl, dw_fr
-        w_dot[2], w_dot[3],       # dw_rl, dw_rr
+        vx, vy, omega,
+        ax, ay, alpha,
+        w_dot[0], w_dot[1],
+        w_dot[2], w_dot[3],
     ])
 
-
-# ── Integration ────────────────────────────────────────────────────
-
 @jax.jit
-def step_rk4(state, u, params, dt):
-    """Single RK4 step with zero-order hold on input."""
-    k1 = dynamics(state,                u, params)
-    k2 = dynamics(state + 0.5 * dt * k1, u, params)
-    k3 = dynamics(state + 0.5 * dt * k2, u, params)
-    k4 = dynamics(state + dt * k3,       u, params)
+def step_rk4(state: jax.Array, u: jax.Array, params: VehicleParams, dt: float) -> jax.Array:
+    """Single RK4 step with zero-order hold on input"""
+    k1: jax.Array = xdot(state, u, params)
+    k2: jax.Array = xdot(state + 0.5 * dt * k1, u, params)
+    k3: jax.Array = xdot(state + 0.5 * dt * k2, u, params)
+    k4: jax.Array = xdot(state + dt * k3, u, params)
     return state + (dt / 6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
 
 
-def rollout(state0, inputs, params, dt):
-    """
-    Simulate forward in time.
-
-    Args:
-        state0: (10,) initial state
-        inputs: (N, 5) input sequence (one per timestep)
-        params: VehicleParams
-        dt:     timestep [s]
-
-    Returns:
-        (N+1, 10) state trajectory (includes initial state)
-    """
-    def scan_fn(state, u):
-        next_state = step_rk4(state, u, params, dt)
-        return next_state, next_state
-
-    _, traj = jax.lax.scan(scan_fn, state0, inputs)
-    return jnp.concatenate([state0[None], traj], axis=0)
-
-
-def rollout_const(state0, u, params, dt, n_steps):
-    """
-    Simulate with constant input.
-
-    Args:
-        state0:  (10,) initial state
-        u:       (5,)  constant input
-        params:  VehicleParams
-        dt:      timestep [s]
-        n_steps: number of steps
-
-    Returns:
-        (n_steps+1, 10) state trajectory
-    """
-    inputs = jnp.tile(u, (n_steps, 1))
-    return rollout(state0, inputs, params, dt)
-
-
-# ── Batch simulation (vmap) ────────────────────────────────────────
-
-# Run N simulations in parallel with different initial states:
-#   batch_step = jax.vmap(step_rk4, in_axes=(0, 0, None, None))
-#
-# Or different parameters (domain randomization):
-#   batch_step = jax.vmap(step_rk4, in_axes=(0, 0, 0, None))
-
-
-# ── Output helpers ─────────────────────────────────────────────────
-
-def body_frame_velocity(state):
-    """World-frame velocity → body-frame velocity."""
-    psi = state[..., PSI]
-    c, s = jnp.cos(psi), jnp.sin(psi)
-    vx_b =  c * state[..., VX] + s * state[..., VY]
-    vy_b = -s * state[..., VX] + c * state[..., VY]
-    return vx_b, vy_b
-
-
-def slip_angle(state):
-    """Vehicle sideslip angle β."""
-    vx_b, vy_b = body_frame_velocity(state)
+def slip_angle(s: jax.Array) -> jax.Array:
+    psi: jax.Array = s[..., PSI]
+    c: jax.Array = jnp.cos(psi)
+    sin: jax.Array = jnp.sin(psi)
+    vx_b: jax.Array = c * s[..., VX] + sin * s[..., VY]
+    vy_b: jax.Array = -sin * s[..., VX] + c * s[..., VY]
     return jnp.arctan2(vy_b, jnp.maximum(vx_b, 1e-3))
 
-
-def speed(state):
-    """Scalar speed [m/s]."""
-    return jnp.sqrt(state[..., VX]**2 + state[..., VY]**2)
-
-
-# ── Convenience constructors ───────────────────────────────────────
-
-def make_state(x=0., y=0., psi=0., vx=0., vy=0., omega=0.,
-               w_fl=0., w_fr=0., w_rl=0., w_rr=0.):
-    return jnp.array([x, y, psi, vx, vy, omega, w_fl, w_fr, w_rl, w_rr])
-
-
-def make_input(tau_fl=0., tau_fr=0., tau_rl=0., tau_rr=0., steer=0.):
-    return jnp.array([tau_fl, tau_fr, tau_rl, tau_rr, steer])
-
-
-def steady_state_wheels(vx, params):
-    """Wheel speeds for no-slip at forward velocity vx."""
-    w = vx / params.r_w
-    return make_state(vx=vx, w_fl=w, w_fr=w, w_rl=w, w_rr=w)
-
-
-# ── Sanity check ───────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    params = VehicleParams()
-    dt = 0.002  # matches FMU stepSize
-
-    # Test 1: straight-line acceleration from rest
-    print("=== Straight-line acceleration ===")
-    s0 = make_state()
-    u  = make_input(tau_fl=5., tau_fr=5., tau_rl=5., tau_rr=5.)
-    traj = rollout_const(s0, u, params, dt, n_steps=2500)  # 5 seconds
-
-    t = jnp.arange(traj.shape[0]) * dt
-    spd = speed(traj)
-    print(f"  t=1s: speed={spd[500]:.2f} m/s, x={traj[500, X]:.2f} m")
-    print(f"  t=3s: speed={spd[1500]:.2f} m/s, x={traj[1500, X]:.2f} m")
-    print(f"  t=5s: speed={spd[2500]:.2f} m/s, x={traj[2500, X]:.2f} m")
-
-    # Test 2: constant speed + step steer
-    print("\n=== Step steer at 10 m/s ===")
-    s0 = steady_state_wheels(10.0, params)
-    u  = make_input(steer=0.1)  # ~5.7 deg
-    traj = rollout_const(s0, u, params, dt, n_steps=1000)  # 2 seconds
-
-    print(f"  t=0.5s: yaw_rate={traj[250, OMEGA]:.3f} rad/s, "
-          f"beta={float(slip_angle(traj[250])):.4f} rad")
-    print(f"  t=2.0s: yaw_rate={traj[1000, OMEGA]:.3f} rad/s, "
-          f"x={traj[1000, X]:.1f} m, y={traj[1000, Y]:.1f} m")
-
-    # Test 3: verify JIT + vmap work
-    print("\n=== JIT + vmap check ===")
-    batch_step = jax.vmap(step_rk4, in_axes=(0, None, None, None))
-    states = jnp.tile(s0, (64, 1))
-    out = batch_step(states, u, params, dt)
-    print(f"  Batched 64 envs: output shape = {out.shape}")
-
-    # Test 4: differentiability
-    print("\n=== Gradient check ===")
-    def loss_fn(u_input):
-        s = steady_state_wheels(10.0, params)
-        for _ in range(50):
-            s = step_rk4(s, u_input, params, dt)
-        return s[Y]  # lateral displacement
-
-    grad_u = jax.grad(loss_fn)(make_input(steer=0.1))
-    print(f"  d(y)/d(steer) = {grad_u[DELTA]:.4f}")
-    print(f"  d(y)/d(tau_fl) = {grad_u[TAU_FL]:.6f}")
-
-    print("\nAll checks passed.")

@@ -1,19 +1,14 @@
-"""
-Wire-format dataclasses for ZMQ serialization (world-frame only).
-"""
-
 import struct
-import math
 from dataclasses import dataclass
 
-from .dynamics import VehicleParams, dynamics, X, Y, PSI, VX, VY, OMEGA
+import jax
+from .dynamics import VehicleParams, xdot, X, Y, PSI, VX, VY, OMEGA
 
-_INPUT_FMT = "5d"
-_STATE_FMT = "9d"
+_INPUT_FMT: str = "5d"
+_STATE_FMT: str = "9d"
 
-INPUT_SIZE = struct.calcsize(_INPUT_FMT)   # 40
-STATE_SIZE = struct.calcsize(_STATE_FMT)   # 72
-
+INPUT_SIZE: int = struct.calcsize(_INPUT_FMT)
+STATE_SIZE: int = struct.calcsize(_STATE_FMT)
 
 @dataclass
 class VehicleInput:
@@ -35,36 +30,33 @@ class VehicleInput:
     def unpack(cls, data: bytes) -> "VehicleInput":
         return cls(*struct.unpack(_INPUT_FMT, data))
 
-
 @dataclass
 class VehicleState:
-    ax_world:       float = 0.0
-    ay_world:       float = 0.0
+    ax_world: float = 0.0
+    ay_world: float = 0.0
     psi_ddot_world: float = 0.0
-    vx_world:       float = 0.0
-    vy_world:       float = 0.0
-    psi_dot_world:  float = 0.0
-    x_world:        float = 0.0
-    y_world:        float = 0.0
-    psi_world:      float = 0.0
+    vx_world: float = 0.0
+    vy_world: float = 0.0
+    psi_dot_world: float = 0.0
+    x_world: float = 0.0
+    y_world: float = 0.0
+    psi_world: float = 0.0
 
     def pack(self) -> bytes:
         return struct.pack(
             _STATE_FMT,
-            self.ax_world,  self.ay_world,  self.psi_ddot_world,
-            self.vx_world,  self.vy_world,  self.psi_dot_world,
-            self.x_world,   self.y_world,   self.psi_world,
+            self.ax_world, self.ay_world, self.psi_ddot_world,
+            self.vx_world, self.vy_world, self.psi_dot_world,
+            self.x_world, self.y_world, self.psi_world,
         )
 
     @classmethod
     def unpack(cls, data: bytes) -> "VehicleState":
         return cls(*struct.unpack(_STATE_FMT, data))
 
-
-def jax_to_vehicle_state(jax_state, jax_input, params: VehicleParams) -> VehicleState:
-    """Derive VehicleState (world-frame only) from the JAX state vector."""
-    deriv = dynamics(jax_state, jax_input, params)
-
+def jax_to_vehicle_state(jax_state: jax.Array, jax_input: jax.Array, params: VehicleParams) -> VehicleState:
+    """Derive VehicleState from the JAX state vector."""
+    deriv: jax.Array = xdot(jax_state, jax_input, params)
     return VehicleState(
         ax_world=float(deriv[3]),
         ay_world=float(deriv[4]),
