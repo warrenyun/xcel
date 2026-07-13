@@ -1,6 +1,6 @@
 """
 Auto-download and cache HT_proto from the latest release
-(i got this idea from pytorch's api)
+(i got this idea from pytorch's api for downloading training datasets)
 """
 
 import importlib
@@ -48,38 +48,30 @@ def _read_version(dest: Path) -> str | None:
     vf = dest / ".version"
     return vf.read_text().strip() if vf.exists() else None
 
-def ensure_proto(update: bool = False) -> Path:
-    """Download the proto lib if missing or if update=True and a newer release exists.
+def ensure_proto() -> Path:
+    """Download the proto lib if missing or a newer release exists
 
-    Returns the path to the cached library directory.
+    Always checks GitHub for the latest tag and updates if out of date
     """
     cached_version = _read_version(CACHE_DIR)
-
-    if cached_version and not update:
-        return CACHE_DIR
-
     tag, url = _get_latest_release_url()
 
-    if cached_version == tag and not update:
+    if cached_version == tag:
         return CACHE_DIR
 
-    if cached_version != tag:
-        print(f"hytech_proto: {'updating ' + cached_version + ' -> ' + tag if cached_version else 'downloading ' + tag}")
-        _download_and_extract(url, CACHE_DIR)
-        _write_version(CACHE_DIR, tag)
-    else:
-        print(f"hytech_proto: already at latest ({tag})")
-
+    print(f"HT_proto: {'updating ' + cached_version + ' -> ' + tag if cached_version else 'downloading ' + tag}")
+    _download_and_extract(url, CACHE_DIR)
+    _write_version(CACHE_DIR, tag)
     return CACHE_DIR
 
 
-def load_proto(update: bool = False) -> types.ModuleType:
+def load_proto() -> types.ModuleType:
     """Load hytech_msgs as a module
 
     proto = load_proto()
     msg = proto.hytech_msgs_pb2.SomeMessage(...)
     """
-    proto_dir = ensure_proto(update=update)
+    proto_dir = ensure_proto()
     lib_dir = proto_dir / "python_hytech_msgs_proto_lib"
 
     if str(lib_dir) not in sys.path:
@@ -88,4 +80,5 @@ def load_proto(update: bool = False) -> types.ModuleType:
     mod = types.ModuleType("hytech_proto")
     mod.hytech_msgs_pb2 = importlib.import_module("hytech_msgs_pb2")
     mod.base_msgs_pb2 = importlib.import_module("base_msgs_pb2")
+    mod.dv_msgs_pb2 = importlib.import_module("dv_msgs_pb2")
     return mod

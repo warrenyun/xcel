@@ -11,7 +11,7 @@ N_AZIM: int = 1024
 N_ELEV: int = 128
 ELEV_MIN: float = np.deg2rad(-22.0)
 ELEV_MAX: float = np.deg2rad(22.0)
-MAX_RANGE: float = 250.0
+MAX_RANGE: float = 90.0
 
 class LidarSensor:
     def __init__(self, world: World, site_name: str = "lidar_site") -> None:
@@ -53,8 +53,8 @@ class LidarSensor:
         sigma = np.interp(r, RANGE_POINTS, SIGMA_POINTS)
         distances[hit] = r + np.random.normal(0.0, sigma)
 
-    def scan(self) -> np.ndarray:
-        """Trace all rays. Returns hit points in sensor frame, shape (N, 3)."""
+    def scan(self) -> tuple[np.ndarray, np.ndarray]:
+        """Trace all rays. Returns (pts_local (N,3) float32, rgba (N,4) uint8)."""
         pnt: np.ndarray = self._data.site_xpos[self._site_id].copy()
         R: np.ndarray = self._data.site_xmat[self._site_id].reshape(3, 3)
 
@@ -74,16 +74,15 @@ class LidarSensor:
 
         hit: np.ndarray = self._dist > 0
         if not np.any(hit):
-            return np.empty((0, 3), dtype=np.float32)
+            empty = np.empty((0, 3), dtype=np.float32)
+            return empty, np.empty((0, 4), dtype=np.uint8)
 
         self._apply_noise(self._dist, hit)
 
-        colors: np.ndarray = self._model.geom_rgba[self._geomid[hit]]
-
-        non_ground = ~np.all(np.isclose(colors[:, :3], 0.22), axis=1)
-        # print(colors[non_ground])
+        rgba_f: np.ndarray = self._model.geom_rgba[self._geomid[hit]]
+        rgba: np.ndarray = (np.clip(rgba_f, 0, 1) * 255).astype(np.uint8)
 
         pts_world: np.ndarray = pnt + self._vecs_buf[hit] * self._dist[hit, None]
         pts_local: np.ndarray = ((pts_world - pnt) @ R).astype(np.float32)
-        return pts_local
+        return pts_local, rgba
 

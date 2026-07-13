@@ -61,14 +61,14 @@ def main():
         visualize.setup_static(world)
         rr.send_blueprint(visualize.blueprint())
 
-    # viewer = None
-    # if not args.headless:
-    #     viewer = mujoco.viewer.launch_passive(world.model, world.data)
-    #     viewer.cam.lookat[:] = [x0, y0, 0.5]
-    #     viewer.cam.distance = 20.0
-    #     viewer.cam.elevation = -25.0
+    viewer = None
+    if not args.headless:
+        viewer = mujoco.viewer.launch_passive(world.model, world.data)
+        viewer.cam.lookat[:] = [x0, y0, 0.5]
+        viewer.cam.distance = 20.0
+        viewer.cam.elevation = -25.0
 
-    comms: SimComms = SimComms()
+    comms: SimComms = SimComms(proto)
     running: bool = True
 
     def stop(_sig: int, _frame: FrameType | None) -> None:
@@ -83,8 +83,7 @@ def main():
     wall_start: float = time.perf_counter()
     last_pts: np.ndarray = np.empty((0, 3), dtype=np.float32)
 
-    while False:
-    # while running and (viewer is None or viewer.is_running()):
+    while running and (viewer is None or viewer.is_running()):
         comms.drain_commands()
         cmd = comms.current_input()
 
@@ -106,8 +105,8 @@ def main():
         comms.send_state(derive_vehicle_state(state, u, params))
 
         if step_i % lidar_rate == 0:
-            last_pts = lidar.scan()
-            comms.send_pointcloud(last_pts)
+            last_pts, last_rgba = lidar.scan()
+            comms.send_pointcloud(last_pts, last_rgba)
 
         if step_i % vis_rate == 0:
             if viewer is not None:
