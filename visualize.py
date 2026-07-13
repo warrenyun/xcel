@@ -1,3 +1,4 @@
+# all of this is slop
 import math
 
 import numpy as np

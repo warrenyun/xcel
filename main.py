@@ -81,7 +81,7 @@ def main():
     sim_t: float = 0.0
     step_i: int = 0
     wall_start: float = time.perf_counter()
-    last_pts: np.ndarray = np.empty((0, 3), dtype=np.float32)
+    latest_pts: np.ndarray = np.empty((0, 3), dtype=np.float32)
 
     while running and (viewer is None or viewer.is_running()):
         comms.drain_commands()
@@ -105,8 +105,8 @@ def main():
         comms.send_state(derive_vehicle_state(state, u, params))
 
         if step_i % lidar_rate == 0:
-            last_pts, last_rgba = lidar.scan()
-            comms.send_pointcloud(last_pts, last_rgba)
+            latest_pts, latest_rgba = lidar.scan()
+            comms.send_pointcloud(latest_pts, latest_rgba)
 
         if step_i % vis_rate == 0:
             if viewer is not None:
@@ -115,7 +115,7 @@ def main():
                 visualize.log_frame(
                     sim_t=sim_t,
                     x=x_i, y=y_i, psi=psi_i,
-                    pts_local=last_pts,
+                    pts_local=latest_pts,
                     speed=math.hypot(float(state[VX]), float(state[VY])),
                     yaw_rate=float(state[OMEGA]),
                     slip=float(slip_angle(state)),

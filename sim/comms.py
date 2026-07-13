@@ -11,13 +11,13 @@ SEND_SOCKET_PORT: int = 6767
 RECV_SOCKET_PORT: int = 5940
 LIDAR_SOCKET_PORT: int = 1155
 
-INPUT_TIMEOUT: float = 1.0 # seconds
+INPUT_TIMEOUT: float = 1.0 # secs
 
-_POINT_DTYPE = np.dtype([
+POINT_DTYPE = np.dtype([
     ('x', '<f4'), ('y', '<f4'), ('z', '<f4'),
     ('r', 'u1'), ('g', 'u1'), ('b', 'u1'), ('a', 'u1'),
 ])
-_POINT_STRIDE: int = _POINT_DTYPE.itemsize  # 16
+POINT_STRIDE: int = POINT_DTYPE.itemsize  # 16
 
 class SimComms:
     def __init__(self, proto: types.ModuleType) -> None:
@@ -67,7 +67,7 @@ class SimComms:
 
     def send_pointcloud(self, pts: np.ndarray, rgba: np.ndarray) -> None:
         n: int = len(pts)
-        buf = np.empty(n, dtype=_POINT_DTYPE)
+        buf = np.empty(n, dtype=POINT_DTYPE)
         buf['x'] = pts[:, 0]
         buf['y'] = pts[:, 1]
         buf['z'] = pts[:, 2]
@@ -79,15 +79,14 @@ class SimComms:
         PEF = self._proto.base_msgs_pb2.PackedElementField
         msg = self._proto.dv_msgs_pb2.PointCloud(
             frame_id="lidar",
-            point_stride=_POINT_STRIDE,
-            fields=[
-                PEF(name="x",     offset=0,  type=PEF.FLOAT32),
-                PEF(name="y",     offset=4,  type=PEF.FLOAT32),
-                PEF(name="z",     offset=8,  type=PEF.FLOAT32),
-                PEF(name="red",   offset=12, type=PEF.UINT8),
-                PEF(name="green", offset=13, type=PEF.UINT8),
-                PEF(name="blue",  offset=14, type=PEF.UINT8),
-                PEF(name="alpha", offset=15, type=PEF.UINT8),
+            point_stride=POINT_STRIDE,
+            fields=[PEF(name="x", offset=0,  type=PEF.FLOAT32),
+                    PEF(name="y", offset=4,  type=PEF.FLOAT32),
+                    PEF(name="z", offset=8,  type=PEF.FLOAT32),
+                    PEF(name="red", offset=12, type=PEF.UINT8),
+                    PEF(name="green", offset=13, type=PEF.UINT8),
+                    PEF(name="blue", offset=14, type=PEF.UINT8),
+                    PEF(name="alpha", offset=15, type=PEF.UINT8),
             ],
             data=buf.tobytes(),
         )
