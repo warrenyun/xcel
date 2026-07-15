@@ -23,6 +23,7 @@ from sim.proto import load_proto
 
 VIEWER_HZ: float = 60.0
 LIDAR_HZ: float = 20.0
+CONES_HZ: float = 1.0  # GT track map is static; low-rate republish covers late joiners
 
 def parse_args():
     p: argparse.ArgumentParser = argparse.ArgumentParser()
@@ -40,6 +41,7 @@ def main():
 
     vis_rate: int = max(1, round(1.0 / (VIEWER_HZ * dt)))
     lidar_rate: int = max(1, round(1.0 / (LIDAR_HZ * dt)))
+    cones_rate: int = max(1, round(1.0 / (CONES_HZ * dt)))
 
     s0 = dynamics.state()
     u0 = dynamics.input()
@@ -102,11 +104,23 @@ def main():
         psi_i: float = float(state[PSI])
 
         world.set_car_pose(x_i, y_i, psi_i)
-        comms.send_state(derive_vehicle_state(state, u, params))
+        # comms.send_state(derive_vehicle_state(state, u, params))  # raw packed struct replaced by typed GT messages below
 
         if step_i % lidar_rate == 0:
             latest_pts, latest_rgba = lidar.scan()
             comms.send_pointcloud(latest_pts, latest_rgba)
+            comms.send_pose(x_i, y_i, psi_i)
+            # transform carries the lidar SITE pose — same mount math as visualize.log_frame
+            comms.send_transform(
+                x_i + visualize.LIDAR_FWD * math.cos(psi_i),
+                y_i + visualize.LIDAR_FWD * math.sin(psi_i),
+                visualize.CAR_Z + visualize.LIDAR_UP,
+                psi_i,
+                int(sim_t * 1e6),
+            )
+
+        if step_i % cones_rate == 0:
+            comms.send_cones(world.cones_left, world.cones_right, int(sim_t * 1e6))
 
         if step_i % vis_rate == 0:
             if viewer is not None:

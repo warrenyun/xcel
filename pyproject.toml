@@ -11,6 +11,7 @@ dependencies = [
     "etils==1.14.0",
     "evdev==1.9.3",
     "fonttools==4.63.0",
+    "foxglove-schemas-protobuf>=0.3.0",
     "fsspec==2026.4.0",
     "glfw==2.10.0",
     "jax==0.10.1",

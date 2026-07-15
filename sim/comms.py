@@ -1,8 +1,13 @@
+import math
 import time
 import types
 
 import numpy as np
 import zmq
+
+from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
+from foxglove_schemas_protobuf.PackedElementField_pb2 import PackedElementField
+from foxglove_schemas_protobuf.PointCloud_pb2 import PointCloud
 
 from .vehicle import VehicleInput, VehicleState, INPUT_SIZE
 
@@ -28,9 +33,10 @@ class SimComms:
         self._cmd.bind(f"{ZMQ_PREFIX}{RECV_SOCKET_PORT}")
         self._cmd.setsockopt(zmq.RCVHWM, 1)
 
+        # multipart channel. carries all low-rate ground-truth data (pose, cones, transforms)
         self._state: zmq.Socket = self._ctx.socket(zmq.PUSH)
         self._state.bind(f"{ZMQ_PREFIX}{SEND_SOCKET_PORT}")
-        self._state.setsockopt(zmq.SNDHWM, 1)
+        self._state.setsockopt(zmq.SNDHWM, 10)
 
         self._lidar: zmq.Socket = self._ctx.socket(zmq.PUSH)
 
@@ -59,11 +65,23 @@ class SimComms:
             return VehicleInput(wheel_steer_rad=self._latest_input.wheel_steer_rad)
         return self._latest_input
 
-    def send_state(self, state: VehicleState) -> None:
+    def _send_typed(self, msg) -> None:
+        """Multipart (type name, body) frame"""
         try:
-            self._state.send(state.pack(), zmq.NOBLOCK)
+            self._state.send_multipart(
+                [msg.DESCRIPTOR.full_name.encode(), msg.SerializeToString()], zmq.NOBLOCK
+            )
         except zmq.Again:
             pass
+
+    def send_pose(self, x: float, y: float, psi: float) -> None:
+        """Ground-truth vehicle pose as hytech_msgs.pose, map frame."""
+        msg = self._proto.base_msgs_pb2.pose()
+        msg.position.x = x
+        msg.position.y = y
+        msg.orientation.z = math.sin(psi * 0.5)
+        msg.orientation.w = math.cos(psi * 0.5)
+        self._send_typed(msg)
 
     def send_pointcloud(self, pts: np.ndarray, rgba: np.ndarray) -> None:
         n: int = len(pts)
@@ -76,8 +94,8 @@ class SimComms:
         buf['b'] = rgba[:, 2]
         buf['a'] = rgba[:, 3]
 
-        PEF = self._proto.base_msgs_pb2.PackedElementField
-        msg = self._proto.dv_msgs_pb2.PointCloud(
+        PEF = PackedElementField
+        msg = PointCloud(
             frame_id="lidar",
             point_stride=POINT_STRIDE,
             fields=[PEF(name="x", offset=0,  type=PEF.FLOAT32),
@@ -95,8 +113,34 @@ class SimComms:
         except zmq.Again:
             pass
 
+    def send_cones(self, cones_left: list[list[float]], cones_right: list[list[float]], t_us: int) -> None:
+        """Ground-truth track map. left = blue, right = yellow"""
+        msg = self._proto.dv_msgs_pb2.Cones(timestamp_us=t_us)
+        for xy in cones_left:
+            cone = msg.cones.add()
+            cone.position.x = xy[0]
+            cone.position.y = xy[1]
+            cone.color = self._proto.dv_msgs_pb2.Cones.BLUE
+        for xy in cones_right:
+            cone = msg.cones.add()
+            cone.position.x = xy[0]
+            cone.position.y = xy[1]
+            cone.color = self._proto.dv_msgs_pb2.Cones.YELLOW
+        self._send_typed(msg)
+
+    def send_transform(self, x: float, y: float, z: float, psi: float, t_us: int) -> None:
+        """map -> lidar transform: pose of the LIDAR SITE (car pose + mount offset), not the car origin."""
+        msg = FrameTransform(parent_frame_id="map", child_frame_id="lidar")
+        msg.timestamp.FromMicroseconds(t_us)
+        msg.translation.x = x
+        msg.translation.y = y
+        msg.translation.z = z
+        msg.rotation.z = math.sin(psi * 0.5)
+        msg.rotation.w = math.cos(psi * 0.5)
+        self._send_typed(msg)
+
     def close(self) -> None:
         self._cmd.close()
-        self._state.close()
+        self._state.close(linger=0)
         self._lidar.close()
         self._ctx.term()

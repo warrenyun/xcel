@@ -11,7 +11,7 @@ N_AZIM: int = 1024
 N_ELEV: int = 128
 ELEV_MIN: float = np.deg2rad(-22.0)
 ELEV_MAX: float = np.deg2rad(22.0)
-MAX_RANGE: float = 90.0
+MAX_RANGE: float = 200.0
 
 class LidarSensor:
     def __init__(self, world: World, site_name: str = "lidar_site") -> None:

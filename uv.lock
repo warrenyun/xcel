@@ -143,6 +143,18 @@ wheels = [
 ]
 
 [[package]]
+name = "foxglove-schemas-protobuf"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/b6/f590a0d4fe6099a9fec39f648180e3a502a9070a0d1d9f705b16853e6222/foxglove_schemas_protobuf-0.3.0.tar.gz", hash = "sha256:40a60ca6557293c14909f8cb8ed0549d42fc408b5d3bc56fff7a7b9f86c97e5a", size = 21626, upload-time = "2025-02-01T00:26:08.024Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/1e/4f89970ca06b6f370acfeb2f7ee47d238e9b2a4975ab8c36298683f0df73/foxglove_schemas_protobuf-0.3.0-py3-none-any.whl", hash = "sha256:322a55f55255ac3ec91dd9d3ffb9e2e030025e2d39e4d15a323418a04d7c5f87", size = 70166, upload-time = "2025-02-01T00:26:04.484Z" },
+]
+
+[[package]]
 name = "fsspec"
 version = "2026.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -930,6 +942,7 @@ dependencies = [
     { name = "etils" },
     { name = "evdev" },
     { name = "fonttools" },
+    { name = "foxglove-schemas-protobuf" },
     { name = "fsspec" },
     { name = "glfw" },
     { name = "jax" },
@@ -985,6 +998,7 @@ requires-dist = [
     { name = "etils", specifier = "==1.14.0" },
     { name = "evdev", specifier = "==1.9.3" },
     { name = "fonttools", specifier = "==4.63.0" },
+    { name = "foxglove-schemas-protobuf", specifier = ">=0.3.0" },
     { name = "fsspec", specifier = "==2026.4.0" },
     { name = "glfw", specifier = "==2.10.0" },
     { name = "jax", specifier = "==0.10.1" },
