@@ -41,6 +41,8 @@ class VehicleParams(NamedTuple):
     s_sld: float = 0.35
     v_adh_min: float = 0.005
     v_sld_min: float = 0.02
+    c_rr: float = 0.015
+    w_rr_eps: float = 0.1
 
 X, Y, PSI, VX, VY, OMEGA, W_FL, W_FR, W_RL, W_RR = range(10)
 """Numerical indicies for the vehicle state JAX array"""
@@ -140,8 +142,11 @@ def xdot(state: jax.Array, u: jax.Array, params: VehicleParams) -> jax.Array:
     ay: jax.Array = jnp.sum(Fy) / p.m
     alpha: jax.Array = jnp.sum(r_wx * Fy - r_wy * Fx) / p.I_zz
 
-    # I_w * w_dot = tau_drive - f_long * r_w
-    w_dot: jax.Array = (tau_drive - f_long * p.r_w) / p.I_w
+    # Rolling resistance, opposing wheel rotation. tanh instead of sign RK4 agrees at standstill
+    tau_rr: jax.Array = -jnp.tanh(w / p.w_rr_eps) * p.c_rr * p.f_n * p.r_w
+
+    # I_w * w_dot = tau_drive + tau_rr - f_long * r_w
+    w_dot: jax.Array = (tau_drive + tau_rr - f_long * p.r_w) / p.I_w
 
     return jnp.array([
         vx, vy, omega,

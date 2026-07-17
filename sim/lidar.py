@@ -11,7 +11,7 @@ N_AZIM: int = 1024
 N_ELEV: int = 128
 ELEV_MIN: float = np.deg2rad(-22.0)
 ELEV_MAX: float = np.deg2rad(22.0)
-MAX_RANGE: float = 200.0
+MAX_RANGE: float = 90.0
 
 class LidarSensor:
     def __init__(self, world: World, site_name: str = "lidar_site") -> None:
@@ -51,7 +51,7 @@ class LidarSensor:
 
         r = distances[hit]
         sigma = np.interp(r, RANGE_POINTS, SIGMA_POINTS)
-        distances[hit] = r + np.random.normal(0.0, sigma)
+        distances[hit] = r + np.random.normal(0.0, sigma / 100.0)
 
     def scan(self) -> tuple[np.ndarray, np.ndarray]:
         """Trace all rays. Returns (pts_local (N,3) float32, rgba (N,4) uint8)."""

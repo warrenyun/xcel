@@ -19,11 +19,12 @@ from sim.vehicle.state import derive_vehicle_state
 from sim.comms import SimComms
 from sim.world import World
 from sim.lidar import LidarSensor
-from sim.proto import load_proto
+from sim.proto import load_can, load_proto
 
 VIEWER_HZ: float = 60.0
 LIDAR_HZ: float = 20.0
-CONES_HZ: float = 1.0  # GT track map is static; low-rate republish covers late joiners
+CONES_HZ: float = 1.0  # static ground truth map
+CAN_TAG: int = 268  # must match the HT_CAN release drivebrain is built against
 
 def parse_args():
     p: argparse.ArgumentParser = argparse.ArgumentParser()
@@ -50,6 +51,7 @@ def main():
     world: World = World(args.track)
     lidar: LidarSensor = LidarSensor(world)
     proto = load_proto()
+    can = load_can(CAN_TAG)
 
     x0: float
     y0: float
@@ -70,7 +72,7 @@ def main():
         viewer.cam.distance = 20.0
         viewer.cam.elevation = -25.0
 
-    comms: SimComms = SimComms(proto)
+    comms: SimComms = SimComms(proto, can)
     running: bool = True
 
     def stop(_sig: int, _frame: FrameType | None) -> None:
@@ -116,11 +118,10 @@ def main():
                 y_i + visualize.LIDAR_FWD * math.sin(psi_i),
                 visualize.CAR_Z + visualize.LIDAR_UP,
                 psi_i,
-                int(sim_t * 1e6),
             )
 
         if step_i % cones_rate == 0:
-            comms.send_cones(world.cones_left, world.cones_right, int(sim_t * 1e6))
+            comms.send_cones(world.cones_left, world.cones_right)
 
         if step_i % vis_rate == 0:
             if viewer is not None:

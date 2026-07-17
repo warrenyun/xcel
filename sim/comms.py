@@ -25,8 +25,9 @@ POINT_DTYPE = np.dtype([
 POINT_STRIDE: int = POINT_DTYPE.itemsize  # 16
 
 class SimComms:
-    def __init__(self, proto: types.ModuleType) -> None:
+    def __init__(self, proto: types.ModuleType, can: types.ModuleType) -> None:
         self._proto = proto
+        self._can = can
         self._ctx: zmq.Context = zmq.Context()
 
         self._cmd: zmq.Socket = self._ctx.socket(zmq.PULL)
@@ -49,12 +50,30 @@ class SimComms:
     def drain_commands(self) -> None:
         while True:
             try:
-                data: bytes = self._cmd.recv(zmq.NOBLOCK)
-                if len(data) == INPUT_SIZE:
-                    self._latest_input = VehicleInput.unpack(data)
-                    self._last_cmd_time = time.monotonic()
+                parts: list[bytes] = self._cmd.recv_multipart(zmq.NOBLOCK)
             except zmq.Again:
                 break
+            if len(parts) < 2:
+                continue
+            self._handle_command(parts[0].decode(), parts[1])
+
+    def _handle_command(self, type_name: str, body: bytes) -> None:
+        """Unpack a drivebrain CAN command into the latest vehicle input."""
+        if type_name == "hytech.drivebrain_desired_torque_input":
+            msg = self._can.hytech_pb2.drivebrain_desired_torque_input()
+            msg.ParseFromString(body)
+            self._latest_input.torque_fl = msg.drivebrain_torque_fl
+            self._latest_input.torque_fr = msg.drivebrain_torque_fr
+            self._latest_input.torque_rl = msg.drivebrain_torque_rl
+            self._latest_input.torque_rr = msg.drivebrain_torque_rr
+        elif type_name == "hytech.drivebrain_steering_input":
+            msg = self._can.hytech_pb2.drivebrain_steering_input()
+            msg.ParseFromString(body)
+            self._latest_input.wheel_steer_rad = math.radians(msg.drivebrain_steering)
+        else:
+            return
+
+        self._last_cmd_time = time.monotonic()
 
     def timed_out(self) -> bool:
         return time.monotonic() - self._last_cmd_time > INPUT_TIMEOUT
@@ -108,14 +127,17 @@ class SimComms:
             ],
             data=buf.tobytes(),
         )
+        # capture time — consumers derive scan age from this, and slam needs it to pair
+        # a scan with odometry. wall clock, to match how drivebrain stamps its logs.
+        msg.timestamp.GetCurrentTime()
         try:
             self._lidar.send(msg.SerializeToString(), zmq.NOBLOCK)
         except zmq.Again:
             pass
 
-    def send_cones(self, cones_left: list[list[float]], cones_right: list[list[float]], t_us: int) -> None:
+    def send_cones(self, cones_left: list[list[float]], cones_right: list[list[float]]) -> None:
         """Ground-truth track map. left = blue, right = yellow"""
-        msg = self._proto.dv_msgs_pb2.Cones(timestamp_us=t_us)
+        msg = self._proto.dv_msgs_pb2.Cones(timestamp_us=int(time.time() * 1e6))
         for xy in cones_left:
             cone = msg.cones.add()
             cone.position.x = xy[0]
@@ -128,10 +150,10 @@ class SimComms:
             cone.color = self._proto.dv_msgs_pb2.Cones.YELLOW
         self._send_typed(msg)
 
-    def send_transform(self, x: float, y: float, z: float, psi: float, t_us: int) -> None:
+    def send_transform(self, x: float, y: float, z: float, psi: float) -> None:
         """map -> lidar transform: pose of the LIDAR SITE (car pose + mount offset), not the car origin."""
         msg = FrameTransform(parent_frame_id="map", child_frame_id="lidar")
-        msg.timestamp.FromMicroseconds(t_us)
+        msg.timestamp.GetCurrentTime()
         msg.translation.x = x
         msg.translation.y = y
         msg.translation.z = z
